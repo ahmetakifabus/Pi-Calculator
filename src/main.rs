@@ -1,10 +1,12 @@
-use ibig::UBig;
+use ibig::{IBig, UBig};
+use rayon::prelude::*;
 use std::time::Instant;
 use std::io::{self, Write};
 use crossterm::event::{read, Event, KeyCode};
 use crossterm::terminal::{enable_raw_mode, disable_raw_mode, Clear, ClearType};
 use crossterm::execute;
 
+// Babil Karekök Algoritması
 fn tam_sayi_karekok(n: &UBig) -> UBig {
     if n == &UBig::from(0u32) { return UBig::from(0u32); }
     let mut x = n / UBig::from(2u32);
@@ -17,82 +19,92 @@ fn tam_sayi_karekok(n: &UBig) -> UBig {
     x
 }
 
-fn yukleme_bari_goster(ilerleme: usize, toplam: usize) {
-    let bar_genisligi = 30;
-    let oran = ilerleme as f64 / toplam as f64;
-    let dolan_kisim = (oran * bar_genisligi as f64).round() as usize;
-
-    let mut bar = String::new();
-    for i in 0..bar_genisligi {
-        if i < dolan_kisim { bar.push('='); } else { bar.push(' '); }
-    }
-    print!("\r    | Hesaplama Durumu: [{}] %{:.1} ", bar, oran * 100.0);
-    io::stdout().flush().unwrap();
+fn ekrani_temizle() {
+    let _ = execute!(io::stdout(), Clear(ClearType::All));
 }
 
-fn ekrani_temizle() {
-    execute!(io::stdout(), Clear(ClearType::All)).unwrap();
-    print!("{}", crossterm::cursor::MoveTo(0, 0));
+// İkili Bölme (Binary Splitting) yapısı
+struct SplitResult {
+    p: IBig,
+    q: IBig,
+    t: IBig,
+}
+
+// Rekürsif (Öz Yinelemeli) ve Çoklu Çekirdekli Ağaç Algoritması
+fn binary_split(a: u32, b: u32) -> SplitResult {
+    if b - a == 1 {
+        if a == 0 {
+            return SplitResult {
+                p: IBig::from(1),
+                q: IBig::from(1),
+                t: IBig::from(13591409),
+            };
+        }
+        
+        let p_val = IBig::from(-((6 * (a as i64) - 5) * (2 * (a as i64) - 1) * (6 * (a as i64) - 1)));
+        let a_i64 = IBig::from(a as i64);
+        let q_val = IBig::from(10939058860032000i64) * &a_i64 * &a_i64 * &a_i64;
+        let t_val = &p_val * (IBig::from(13591409i64) + IBig::from(545140134i64) * a_i64);
+        
+        SplitResult { p: p_val, q: q_val, t: t_val }
+    } else {
+        let m = (a + b) / 2;
+        
+        // İşlemcinin çekirdeklerine göre işi paralel olarak 2'ye böl (RAYON MAGIC)
+        let (left, right) = rayon::join(|| binary_split(a, m), || binary_split(m, b));
+        
+        let p_val = &left.p * &right.p;
+        let q_val = &left.q * &right.q;
+        let t_val = &left.t * &right.q + &left.p * &right.t;
+        
+        SplitResult { p: p_val, q: q_val, t: t_val }
+    }
 }
 
 fn main() {
     loop {
         ekrani_temizle();
-        
-        println!("██████╗ ██╗     ██████╗ █████╗ ██╗      ██████╗██╗   ██╗██╗      █████╗ ████████╗ ██████╗ ██████╗");
-        println!("██╔══██╗██║    ██╔════╝██╔══██╗██║     ██╔════╝██║   ██║██║     ██╔══██╗╚══██╔══╝██╔═══██╗██╔══██╗");
-        println!("██████╔╝██║    ██║     ███████║██║     ██║     ██║   ██║██║     ███████║   ██║   ██║   ██║██████╔╝");
-        println!("██╔═══╝ ██║    ██║     ██╔══██║██║     ██║     ██║   ██║██║     ██╔══██║   ██║   ██║   ██║██╔══██╗");
-        println!("██║     ██║    ╚██████╗██║  ██║███████╗╚██████╗╚██████╔╝███████╗██║  ██║   ██║   ╚██████╔╝██║  ██║");
-        println!("╚═╝     ╚═╝     ╚═════╝╚═╝  ╚═╝╚══════╝ ╚═════╝ ╚═════╝ ╚══════╝╚═╝  ╚═╝   ╚═╝    ╚═════╝ ╚═╝  ╚═╝");
-                                                                                                      
-        print!(" -> Hesaplamak istediğiniz basamak sayısını girin: ");
+        println!("██████╗ ██╗     ██████╗ █████╗ ██╗      ██████╗██╗   ██╗██╗      █████╗ ████████╗ ██████╗ ██████╗     ███╗   ███╗ █████╗ ██╗  ██╗");
+        println!("██╔══██╗██║    ██╔════╝██╔══██╗██║     ██╔════╝██║   ██║██║     ██╔══██╗╚══██╔══╝██╔═══██╗██╔══██╗    ████╗ ████║██╔══██╗╚██╗██╔╝");
+        println!("██████╔╝██║    ██║     ███████║██║     ██║     ██║   ██║██║     ███████║   ██║   ██║   ██║██████╔╝    ██╔████╔██║███████║ ╚███╔╝ ");
+        println!("██╔═══╝ ██║    ██║     ██╔══██║██║     ██║     ██║   ██║██║     ██╔══██║   ██║   ██║   ██║██╔══██╗    ██║╚██╔╝██║██╔══██║ ██╔██╗ ");
+        println!("██║     ██║    ╚██████╗██║  ██║███████╗╚██████╗╚██████╔╝███████╗██║  ██║   ██║   ╚██████╔╝██║  ██║    ██║ ╚═╝ ██║██║  ██║██╔╝ ██╗");
+        println!("╚═╝     ╚═╝     ╚═════╝╚═╝  ╚═╝╚══════╝ ╚═════╝ ╚═════╝ ╚══════╝╚═╝  ╚═╝   ╚═╝    ╚═════╝ ╚═╝  ╚═╝    ╚═╝     ╚═╝╚═╝  ╚═╝╚═╝  ╚═╝");
+        print!(" -> Hesaplamak istediginiz basamak sayisini girin: ");
         io::stdout().flush().unwrap();
         
         let mut girdi = String::new();
-        io::stdin().read_line(&mut girdi).expect("Girdi okunamadı");
+        io::stdin().read_line(&mut girdi).expect("Girdi okunamadi");
         
         let basamak_sayisi: u32 = match girdi.trim().parse() {
             Ok(sayi) => sayi,
             Err(_) => {
-                println!("| Hata: Geçerli bir sayı girmediniz! Varsayilan: 100.000");
+                println!("| Hata: Gecerli bir sayi girmediniz! Varsayilan: 100.000");
                 100_000
             }
         };
 
-        println!("+-------------------------------------------------------+");
-        println!("    Hesaplama başlatıldı...");
+        println!("\n[!] DIKKAT: Cekirdekler atese veriliyor, lutfen bekleyin...");
         let baslangic = Instant::now();
 
-        let c = UBig::from(426880u32);
-        let mut l = UBig::from(13591409u32);
-        let mut x = UBig::from(1u32);
-        let mut m = UBig::from(1u32);
-        let mut s = UBig::from(13591409u32);
-        
         let adim_sayisi = (basamak_sayisi / 14) + 1;
-        let olcek = UBig::from(10u32).pow((basamak_sayisi + 20).try_into().unwrap());
 
-        for q in 1..=adim_sayisi {
-            let q_ub = UBig::from(q);
-            let k = 12 * q;
-            let pay = UBig::from((k - 5) * (k - 9) * (k - 1));
-            m = (m * pay) / (&q_ub * &q_ub * &q_ub);
-            l += 545140134u32;
-            x *= 262537412640768000u64;
+        // 1. AŞAMA: Ağaç yapısında paralel ikili bölme
+        let result = binary_split(0, adim_sayisi);
 
-            let terim = (&m * &l) / &x;
-            if q % 2 == 1 { s -= terim; } else { s += terim; }
+        let q_ub = UBig::try_from(result.q).unwrap();
+        let t_ub = UBig::try_from(result.t).unwrap();
 
-            if q % 50 == 0 || q == adim_sayisi {
-                yukleme_bari_goster(q as usize, adim_sayisi as usize);
-            }
-        }
-        println!();
-
+        // 2. AŞAMA: Ölçekleme ve Karekök
+        let olcek = UBig::from(10u32).pow((basamak_sayisi + 20) as usize);
         let ic_kisim = UBig::from(10005u32) * &olcek * &olcek;
         let karekok = tam_sayi_karekok(&ic_kisim);
-        let mut pi = (c * karekok) / s;
+
+        // 3. AŞAMA: Nihai Pi Birleştirmesi
+        let c = UBig::from(426880u32);
+        let pay = c * karekok * q_ub;
+        let mut pi = pay / t_ub;
+        
         pi /= UBig::from(10u32).pow(20);
 
         let gecen_sure = baslangic.elapsed();
@@ -100,25 +112,20 @@ fn main() {
         let dosya_adi = format!("pi_{}.txt", basamak_sayisi);
         let pi_str = pi.to_string();
         let formatli_pi = format!("{}.{}", &pi_str[0..1], &pi_str[1..]);
-        std::fs::write(&dosya_adi, formatli_pi).expect("Dosya yazılamadı");
+        std::fs::write(&dosya_adi, formatli_pi).expect("Dosya yazilamadi");
 
-        println!("+-------------------------------------------------------+");
-        println!("|               HESAPLAMA BAŞARIYLA BİTTİ               |");
-        println!("+-------------------------------------------------------+");
-        println!("  -> Geçen Süre      : {:?}", gecen_sure);
-        println!("  -> Hesaplanan Hane : {} basamak", basamak_sayisi);
-        println!("  -> Kaydedilen Dosya: {}", dosya_adi);
-        println!("+-------------------------------------------------------+");
+        println!("\n================== HESAPLAMA TAMAMLANDI =======================");
+        println!("  -> Toplam Sure     : {:?}", gecen_sure);
+        println!("  -> Basamak         : {}", basamak_sayisi);
+        println!("  -> Kayit Dosyasi   : {}", dosya_adi);
+        println!("===============================================================");
 
-        // --- ESC İLE ÇIKIŞ SİSTEMİ ---
-        print!("\nYeni bir hesaplama yapmak için Enter'a basın (Programdan çıkmak için ESC'ye basın.)... ");
+        print!("\nYeni hesaplama icin Enter, cikmak icin ESC... ");
         io::stdout().flush().unwrap();
 
-        enable_raw_mode().unwrap(); // Terminali anlık tuş okuma moduna geçiriyoruz
+        enable_raw_mode().unwrap();
         let mut cikis_yapildi = false;
-        
         loop {
-            // Kullanıcının bastığı tuşu anında yakala
             if let Event::Key(key_event) = read().unwrap() {
                 if key_event.code == KeyCode::Esc {
                     cikis_yapildi = true;
@@ -128,11 +135,10 @@ fn main() {
                 }
             }
         }
-        disable_raw_mode().unwrap(); // Terminali normal moduna geri döndür
+        disable_raw_mode().unwrap();
 
         if cikis_yapildi {
             ekrani_temizle();
-            println!("Eco-Pi Calculator kapatılıyor... İyi çalışmalar!");
             break;
         }
     }
