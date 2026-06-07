@@ -1,8 +1,9 @@
 [package]
-name = "eco_pi_calculator"
+name = "max_pi_calculator"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
 ibig = "0.3.6"
 crossterm = "0.27"
+rayon = "1.10"
